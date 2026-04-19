@@ -88,7 +88,7 @@ Content-Type: `application/json`
 |                      |                |          | - `first_name`, `last_name`: User's name components                                                      |
 |                      |                |          | - `name`: Alternative to first_name/last_name                                                            |
 |                      |                |          | - `username`: User's username                                                                            |
-|                      |                |          | - `photo.url` or `photo.big_file_id`: Avatar image                                                       |
+|                      |                |          | - `photo.url`, `photo.base64`, or `photo.big_file_id`: Avatar image                                                       |
 |                      |                |          | - `emoji_status`: Custom emoji status ID (optional)                                                      |
 | `text`               | string         | No       | Message text (up to 4096 characters).                                                                    |
 | `entities`           | array          | No       | Telegram text styles: `bold`, `italic`, `underline`, `strikethrough`, `code`, links, hashtags, etc.      |
@@ -101,7 +101,7 @@ Content-Type: `application/json`
 |                      |                |          | - `chatId`: ID of the chat where the original message was sent (defaults to sender ID if missing)         |
 |                      |                |          | - `from`: Optional user information about the reply author                                               |
 | `media`              | object\|array  | No       | If array is passed, uses the last file (or second if `mediaCrop=true`).                                 |
-|                      |                |          | If object: `{ url }` or `{ file_id, width, height, is_animated }`                                        |
+|                      |                |          | If object: `{ url }`, `{ base64 }`, or `{ file_id, width, height, is_animated }`                                        |
 | `mediaType`          | string         | No       | `sticker` for stickers, otherwise text/image.                                                            |
 | `mediaCrop`          | boolean        | No       | Whether to crop media to maintain proportions.                                                           |
 | `voice`              | object         | No       | Voice message: `{ waveform: [...number] }`. Displayed as a waveform.                                     |
@@ -211,6 +211,13 @@ Using URL:
 ```json
 "media": {
   "url": "https://example.com/image.jpg"
+}
+```
+
+Using base64:
+```json
+"media": {
+  "base64": "iVBORw0KGgoAAAANSUhEUgAA..."
 }
 ```
 

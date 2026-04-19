@@ -174,6 +174,8 @@ class QuoteGenerate {
 
     if (avatarImageCache) {
       avatarImage = avatarImageCache
+    } else if (user.photo && user.photo.base64) {
+      avatarImage = await loadImage(Buffer.from(user.photo.base64, 'base64'))
     } else if (user.photo && user.photo.url) {
       avatarImage = await loadImage(user.photo.url)
     } else {
@@ -242,19 +244,25 @@ class QuoteGenerate {
 
   async downloadMediaImage (media, mediaSize, type = 'id', crop = true) {
     try {
-      let mediaUrl
-      if (type === 'id') mediaUrl = await this.telegram.getFileLink(media).catch(console.error)
-      else mediaUrl = media
+      let load
+      let mediaUrl = ''
 
-      if (!mediaUrl) {
-        console.warn('Failed to get media URL, skipping media')
-        return null
+      if (type === 'base64') {
+        load = Buffer.from(media, 'base64')
+      } else {
+        if (type === 'id') mediaUrl = await this.telegram.getFileLink(media).catch(console.error)
+        else mediaUrl = media
+
+        if (!mediaUrl) {
+          console.warn('Failed to get media URL, skipping media')
+          return null
+        }
+
+        load = await loadImageFromUrl(mediaUrl).catch((error) => {
+          console.warn('Failed to load image from URL:', error.message)
+          return null
+        })
       }
-
-      const load = await loadImageFromUrl(mediaUrl).catch((error) => {
-        console.warn('Failed to load image from URL:', error.message)
-        return null
-      })
 
       if (!load) {
         console.warn('Failed to load media, skipping')
@@ -321,7 +329,8 @@ class QuoteGenerate {
         }
       } else {
         try {
-          return await loadImage(load)
+          const pngBuf = await sharp(load).png().toBuffer()
+          return await loadImage(pngBuf)
         } catch (loadError) {
           console.warn('Failed to load image:', loadError.message)
           return null
@@ -693,7 +702,10 @@ class QuoteGenerate {
       let wordX = (lineDirection === 'rtl') ? maxWidth - lineX - wordlWidth - fontSize * 2 : lineX
 
       if (emojiImage) {
-        canvasCtx.drawImage(emojiImage, wordX, lineY - fontSize + (fontSize * 0.15), fontSize + (fontSize * 0.22), fontSize + (fontSize * 0.22))
+        // Align emoji perfectly with the text baseline and reduce overly large scaling
+        const emojiSize = fontSize + (fontSize * 0.1)
+        const emojiY = lineY - fontSize + (fontSize * 0.08)
+        canvasCtx.drawImage(emojiImage, wordX, emojiY, emojiSize, emojiSize)
       } else {
         canvasCtx.fillText(styledWord.word, wordX, lineY)
 
@@ -896,7 +908,7 @@ class QuoteGenerate {
     return canvas
   }
 
-  async drawQuote (scale = 1, backgroundColorOne, backgroundColorTwo, avatar, replyName, replyNameColor, replyText, name, text, media, mediaType, maxMediaSize) {
+  async drawQuote (scale = 1, backgroundColorOne, backgroundColorTwo, avatar, replyName, replyNameColor, replyText, replyMedia, name, text, media, mediaType, maxMediaSize) {
     const avatarPosX = 0 * scale
     const avatarPosY = 5 * scale
     const avatarSize = 50 * scale
@@ -949,17 +961,52 @@ class QuoteGenerate {
     let replyNamePosY = 0
     let replyTextPosY = 0
 
-    if (replyName && replyText) {
+    const replyThumbSize = 42 * scale
+    let replyMediaPosX = 0
+    let replyMediaPosY = 0
+    let replyMediaWidth = 0
+    let replyMediaHeight = 0
+
+    if (replyName && (replyText || replyMedia)) {
       replyPosX = textPosX + indent
 
-      const replyNameHeight = replyName.height
-      const replyTextHeight = replyText.height * 0.5
+      // Use actual visual line heights to avoid excessive padding
+      const visualReplyNameHeight = 20 * scale
+      let visualReplyTextHeight = 0
+      if (replyText) {
+        visualReplyTextHeight = replyText.height > 40 * scale ? replyText.height * 0.45 : 18 * scale
+      }
 
-      replyNamePosY = namePosY + replyNameHeight
-      replyTextPosY = replyNamePosY + replyTextHeight
+      // If there is no main name, align to top. Otherwise offset neatly below the main name
+      replyNamePosY = namePosY + (name ? 25 * scale : 10 * scale)
+      replyTextPosY = replyNamePosY + visualReplyNameHeight
 
-      textPosY += replyNameHeight + replyTextHeight + (indent / 4)
-      height += replyNameHeight + replyTextHeight + (indent / 4)
+      const replyTotalVisualHeight = visualReplyNameHeight + visualReplyTextHeight
+
+      if (replyMedia) {
+        // Thumbnail height should perfectly match the two lines of text
+        replyMediaHeight = replyTotalVisualHeight
+        replyMediaWidth = replyMedia.width * (replyMediaHeight / replyMedia.height)
+        
+        replyMediaPosX = replyPosX
+        // Nudge the thumbnail down slightly to perfectly align with text baselines
+        replyMediaPosY = replyNamePosY + 2 * scale
+
+        // Always shift name/text to the right of the thumbnail
+        replyPosX += replyMediaWidth + indent * 0.5
+
+        // Make sure width accommodates thumbnail + name/text
+        const textAfterThumb = replyText ? replyText.width : replyName.width
+        const thumbAndTextWidth = replyMediaWidth + indent * 0.5 + textAfterThumb
+        if (width < thumbAndTextWidth + blockPosX + indent * 3) {
+          width = thumbAndTextWidth + blockPosX + indent * 3
+        }
+      }
+
+      // Calculate how much space the reply block takes up vertically
+      const blockHeight = replyTotalVisualHeight + (indent * 0.8)
+      textPosY = replyNamePosY + replyTotalVisualHeight + indent * 0.2
+      height += blockHeight
     }
 
     let mediaPosX = 0
@@ -999,7 +1046,7 @@ class QuoteGenerate {
     let rectHeight = height
 
     if (mediaType === 'sticker' && (name || replyName)) {
-      rectHeight = replyName && replyText ? (replyName.height + replyText.height * 0.5) + indent * 2 : indent * 2
+      rectHeight = (replyName && (replyText || replyMedia)) ? (replyName.height + (replyText ? replyText.height * 0.5 : replyThumbSize)) + indent * 2 : indent * 2
       backgroundColorOne = backgroundColorTwo = 'rgba(0, 0, 0, 0.5)'
     }
 
@@ -1012,7 +1059,7 @@ class QuoteGenerate {
 
     let rect
     if (mediaType === 'sticker' && (name || replyName)) {
-      rectHeight = (replyName.height + replyText.height * 0.5) + indent * 2
+      rectHeight = (replyName && (replyText || replyMedia)) ? (replyName.height + (replyText ? replyText.height * 0.5 : replyThumbSize)) + indent * 2 : indent * 2
       backgroundColorOne = backgroundColorTwo = 'rgba(0, 0, 0, 0.5)'
     }
 
@@ -1030,11 +1077,21 @@ class QuoteGenerate {
     if (text) canvasCtx.drawImage(text, textPosX, textPosY)
     if (media) canvasCtx.drawImage(this.roundImage(media, 5 * scale), mediaPosX, mediaPosY, mediaWidth, mediaHeight)
 
-    if (replyName && replyText) {
-      canvasCtx.drawImage(this.drawReplyLine(3 * scale, replyName.height + replyText.height * 0.4, replyNameColor), textPosX - 3, replyNamePosY)
+    if (replyName && (replyText || replyMedia)) {
+      const replyLineHeight = (replyMedia && replyMediaHeight) ? replyMediaHeight : (20 * scale + (replyText ? (replyText.height > 40 * scale ? replyText.height * 0.45 : 18 * scale) : 0))
+      // Nudge the line down to match the baseline alignment
+      canvasCtx.drawImage(this.drawReplyLine(3 * scale, replyLineHeight, replyNameColor), textPosX - 3, replyNamePosY + 2 * scale)
 
       canvasCtx.drawImage(replyName, replyPosX, replyNamePosY)
-      canvasCtx.drawImage(replyText, replyPosX, replyTextPosY)
+      if (replyText) canvasCtx.drawImage(replyText, replyPosX, replyTextPosY)
+
+      if (replyMedia) {
+        canvasCtx.drawImage(
+          this.roundImage(replyMedia, 4 * scale),
+          replyMediaPosX, replyMediaPosY,
+          replyMediaWidth, replyMediaHeight
+        )
+      }
     }
 
     return canvas
@@ -1201,8 +1258,8 @@ class QuoteGenerate {
       }
     }
 
-    let replyName, replyNameColor, replyText
-    if (message.replyMessage && message.replyMessage.name && message.replyMessage.text) {
+    let replyName, replyNameColor, replyText, replyMediaCanvas
+    if (message.replyMessage && message.replyMessage.name && (message.replyMessage.text || message.replyMessage.media)) {
       try {
         // Ensure chatId exists to prevent NaN in calculations
         const chatId = message.replyMessage.chatId || 0
@@ -1222,26 +1279,75 @@ class QuoteGenerate {
           emojiBrand
         )
 
-        let textColor = '#fff'
-        if (backStyle === 'light') textColor = '#000'
+        // Determine reply label text — use caption if given, otherwise derive from mediaType
+        let replyLabelText = message.replyMessage.text
+        if (!replyLabelText && message.replyMessage.media) {
+          const replyMediaType = message.replyMessage.mediaType || ''
+          if (replyMediaType === 'sticker') replyLabelText = '⭐ Sticker'
+          else if (replyMediaType === 'video') replyLabelText = '🎥 Video'
+          else if (replyMediaType === 'animation' || replyMediaType === 'gif') replyLabelText = '🎞 GIF'
+          else if (replyMediaType === 'audio') replyLabelText = '🎵 Audio'
+          else if (replyMediaType === 'voice') replyLabelText = '🎤 Voice message'
+          else if (replyMediaType === 'document') replyLabelText = '📄 File'
+          else replyLabelText = '📷 Photo'
+        }
 
-        const replyTextFontSize = 21 * scale
-        replyText = await this.drawMultilineText(
-          message.replyMessage.text,
-          message.replyMessage.entities || [],
-          replyTextFontSize,
-          textColor,
-          0,
-          replyTextFontSize,
-          width * 0.9,
-          replyTextFontSize,
-          emojiBrand
-        )
+        if (replyLabelText) {
+          let textColor = '#fff'
+          if (backStyle === 'light') textColor = '#000'
+
+          let replyTextFontSize = 21 * scale
+
+          // Use dimmer color and smaller font for auto-generated media labels (no caption)
+          if (!message.replyMessage.text) {
+            textColor = 'rgba(255,255,255,0.55)'
+            replyTextFontSize = 16 * scale
+          }
+
+          replyText = await this.drawMultilineText(
+            replyLabelText,
+            message.replyMessage.entities || [],
+            replyTextFontSize,
+            textColor,
+            0,
+            replyTextFontSize,
+            width * 0.9,
+            replyTextFontSize,
+            emojiBrand
+          )
+        }
+
+        // Download reply thumbnail if provided
+        if (message.replyMessage.media) {
+          const rm = message.replyMessage.media
+          let rmType = 'id'
+          let rmMedia = rm
+
+          if (rm.base64) {
+            rmType = 'base64'
+            rmMedia = rm.base64
+          } else if (rm.url) {
+            rmType = 'url'
+            rmMedia = rm.url
+          } else if (rm.file_id) {
+            rmType = 'id'
+            rmMedia = rm.file_id
+          } else if (Array.isArray(rm) && rm.length > 0) {
+            rmType = 'id'
+            rmMedia = rm[rm.length - 1].file_id || rm[rm.length - 1]
+          }
+
+          replyMediaCanvas = await this.downloadMediaImage(rmMedia, 42 * scale, rmType, false).catch((err) => {
+            console.warn('Failed to download reply thumbnail:', err.message)
+            return null
+          })
+        }
       } catch (error) {
         console.error('Error generating reply message:', error)
         // If reply message generation fails, continue without it
         replyName = null
         replyText = null
+        replyMediaCanvas = null
       }
     }
 
@@ -1252,7 +1358,10 @@ class QuoteGenerate {
       let crop = false
       if (message.mediaCrop) crop = true
 
-      if (message.media.url) {
+      if (message.media.base64) {
+        type = 'base64'
+        media = message.media.base64
+      } else if (message.media.url) {
         type = 'url'
         media = message.media.url
       } else {
@@ -1296,7 +1405,7 @@ class QuoteGenerate {
       scale,
       backgroundColorOne, backgroundColorTwo,
       avatarCanvas,
-      replyName, replyNameColor, replyText,
+      replyName, replyNameColor, replyText, replyMediaCanvas,
       nameCanvas, textCanvas,
       mediaCanvas, mediaType, maxMediaSize
     )

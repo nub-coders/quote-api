@@ -1,15 +1,27 @@
 services:
   quote-api:
     build: .
+    env_file:
+      - .env
     environment:
       - NODE_ENV=production
+      - VIRTUAL_HOST=quote.nubcoder.com
+      - LETSENCRYPT_HOST=quote.nubcoder.com
+      - LETSENCRYPT_EMAIL=dev@nubcoder.com
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
       interval: 30s
       timeout: 10s
       retries: 3
-    restart: unless-stopped
+    restart: always
+    networks:
+      - web
     deploy:
       resources:
         limits:
           memory: 1G
+
+
+networks:
+  web:
+    external: true

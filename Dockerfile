@@ -34,6 +34,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     fonts-noto \
     fonts-noto-cjk \
     fonts-noto-extra \
+    fonts-freefont-ttf \
+    fonts-symbola \
+    fonts-dejavu \
+    fonts-stix \
     fontconfig \
     libcairo2 \
     libpango-1.0-0 \
