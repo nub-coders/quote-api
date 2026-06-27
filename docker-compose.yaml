@@ -5,9 +5,12 @@ services:
       - .env
     environment:
       - NODE_ENV=production
-      - VIRTUAL_HOST=quote.nubcoder.com
-      - LETSENCRYPT_HOST=quote.nubcoder.com
-      - LETSENCRYPT_EMAIL=dev@nubcoder.com
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.quote-api.rule=Host(`quote.nubcoder.com`)"
+      - "traefik.http.routers.quote-api.entrypoints=websecure"
+      - "traefik.http.routers.quote-api.tls.certresolver=letsencrypt"
+      - "traefik.http.services.quote-api.loadbalancer.server.port=3000"
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
       interval: 30s
