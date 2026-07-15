@@ -59,7 +59,9 @@ async function downloadAvatarImage (user, telegram) {
     return avatarImageCached
   }
 
-  if (user.photo && user.photo.url) {
+  if (user.photo && user.photo.base64) {
+    avatarImage = await loadImage(Buffer.from(user.photo.base64, 'base64')).catch(() => null)
+  } else if (user.photo && user.photo.url) {
     avatarImage = await loadImage(user.photo.url).catch(() => null)
   }
 

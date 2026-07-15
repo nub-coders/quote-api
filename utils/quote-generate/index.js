@@ -182,14 +182,27 @@ class QuoteGenerate {
     }
 
     let replyData = null
-    if (message.replyMessage && message.replyMessage.name && message.replyMessage.text) {
+    if (message.replyMessage && message.replyMessage.name && (message.replyMessage.text || message.replyMessage.media)) {
       try {
         const chatId = message.replyMessage.chatId || 0
         const replyNameIndex = Math.abs(chatId) % 7
         const replyNameColor = nameColorArray[replyNameIndex]
 
         const replyName = typeof message.replyMessage.name === 'string' ? message.replyMessage.name : String(message.replyMessage.name)
-        const replyText = typeof message.replyMessage.text === 'string' ? message.replyMessage.text : String(message.replyMessage.text)
+
+        // Media-only reply → derive a Telegram-style label from mediaType
+        let replyText = message.replyMessage.text
+        if (!replyText && message.replyMessage.media) {
+          const rmType = message.replyMessage.mediaType || ''
+          if (rmType === 'sticker') replyText = '⭐ Sticker'
+          else if (rmType === 'video') replyText = '🎥 Video'
+          else if (rmType === 'animation' || rmType === 'gif') replyText = '🎞 GIF'
+          else if (rmType === 'audio') replyText = '🎵 Audio'
+          else if (rmType === 'voice') replyText = '🎤 Voice message'
+          else if (rmType === 'document') replyText = '📄 File'
+          else replyText = '📷 Photo'
+        }
+        if (typeof replyText !== 'string') replyText = String(replyText)
 
         const replyNameFontSize = 14 * scale
         const replyNameCanvas = await drawMultilineText(
@@ -210,11 +223,22 @@ class QuoteGenerate {
           // Thumbnail of the replied media (photo/video/sticker…), like the
           // modern Telegram reply preview. Best-effort — silently skipped.
           const replyMedia = message.replyMessage.media
-          if (replyMedia && replyMedia.fileId) {
+          if (replyMedia) {
             try {
-              const fileUrl = await this.telegram.getFileLink(replyMedia.fileId)
-              const buffer = await loadImageFromUrl(fileUrl)
-              replyData.thumb = await loadImage(buffer)
+              let buffer
+              if (replyMedia.base64) {
+                buffer = Buffer.from(replyMedia.base64, 'base64')
+              } else if (replyMedia.url) {
+                buffer = await loadImageFromUrl(replyMedia.url)
+              } else {
+                const fileId = replyMedia.fileId || replyMedia.file_id ||
+                  (Array.isArray(replyMedia) && replyMedia.length > 0 && (replyMedia[replyMedia.length - 1].file_id || replyMedia[replyMedia.length - 1]))
+                if (fileId) {
+                  const fileUrl = await this.telegram.getFileLink(fileId)
+                  buffer = await loadImageFromUrl(fileUrl)
+                }
+              }
+              if (buffer) replyData.thumb = await loadImage(buffer)
             } catch (error) {
               console.warn('Failed to load reply thumb:', error.message)
             }
@@ -234,7 +258,10 @@ class QuoteGenerate {
       let media, type
       let crop = !!message.mediaCrop
 
-      if (message.media.url) {
+      if (message.media.base64) {
+        type = 'base64'
+        media = message.media.base64
+      } else if (message.media.url) {
         type = 'url'
         media = message.media.url
       } else {

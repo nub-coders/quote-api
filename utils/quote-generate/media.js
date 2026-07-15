@@ -51,19 +51,25 @@ async function downloadMediaImage (media, mediaSize, type, crop, telegram) {
   crop = crop !== undefined ? crop : true
 
   try {
+    let load
     let mediaUrl
-    if (type === 'id') mediaUrl = await telegram.getFileLink(media).catch(console.error)
-    else mediaUrl = media
 
-    if (!mediaUrl) {
-      console.warn('Failed to get media URL, skipping media')
-      return null
+    if (type === 'base64') {
+      load = Buffer.from(media, 'base64')
+    } else {
+      if (type === 'id') mediaUrl = await telegram.getFileLink(media).catch(console.error)
+      else mediaUrl = media
+
+      if (!mediaUrl) {
+        console.warn('Failed to get media URL, skipping media')
+        return null
+      }
+
+      load = await loadImageFromUrl(mediaUrl).catch((error) => {
+        console.warn('Failed to load image from URL:', error.message)
+        return null
+      })
     }
-
-    let load = await loadImageFromUrl(mediaUrl).catch((error) => {
-      console.warn('Failed to load image from URL:', error.message)
-      return null
-    })
 
     if (!load) {
       console.warn('Failed to load media, skipping')
