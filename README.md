@@ -32,7 +32,7 @@ Generator for creating images with "quotes" from Telegram messages.
 ## Installation
 
 ```bash
-git clone https://github.com/LyoSU/quote-api.git
+git clone https://github.com/nub-coders/quote-api.git
 cd quote-api
 npm install
 ```
@@ -47,6 +47,19 @@ npm start
 # Or directly
 node index.js
 ```
+
+### Docker
+
+The image bundles the native deps (canvas, sharp, ffmpeg) and Noto/Symbola fonts, so no host setup is needed.
+
+```bash
+# Build and run with docker compose (reads BOT_TOKEN from .env)
+docker compose up -d --build
+```
+
+The bundled `docker-compose.yaml` ships Traefik labels for `quote.nubcoder.com` and joins an external `web` network — adjust the host rule and network to match your setup. `Dockerfile.coolify` / `docker-compose.coolify.yml` are provided for Coolify deployments.
+
+Optional env: set `BOT_API_ROOT` to route `getFile` and file downloads through a self-hosted Telegram Bot API server instead of the Telegram cloud.
 
 ---
 
@@ -100,6 +113,7 @@ Content-Type: `application/json`
 |                      |                |          | - `entities`: Text styles in the reply                                                                   |
 |                      |                |          | - `chatId`: ID of the chat where the original message was sent (defaults to sender ID if missing)         |
 |                      |                |          | - `from`: Optional user information about the reply author                                               |
+|                      |                |          | - `media`: Optional thumbnail of the replied media. `{ url }`, `{ base64 }`, or `{ file_id }`. Renders a media-only reply preview (auto label) when `text` is absent. |
 | `media`              | object\|array  | No       | If array is passed, uses the last file (or second if `mediaCrop=true`).                                 |
 |                      |                |          | If object: `{ url }`, `{ base64 }`, or `{ file_id, width, height, is_animated }`                                        |
 | `mediaType`          | string         | No       | `sticker` for stickers, otherwise text/image.                                                            |
@@ -284,13 +298,13 @@ This is especially useful for integrations that require direct file responses ra
 
 There is a deployed instance of this API available at:
 ```
-https://quote.yuri.ly/quote/generate
+https://quote.nubcoder.com/generate
 ```
 
 You can also use format-specific endpoints:
 ```
-https://quote.yuri.ly/quote/generate.png
-https://quote.yuri.ly/quote/generate.webp
+https://quote.nubcoder.com/generate.png
+https://quote.nubcoder.com/generate.webp
 ```
 
 You can use these URLs for testing purposes, but please note that stability isn't guaranteed for production use.
@@ -319,7 +333,7 @@ const simpleExample = async () => {
       }]
     }
 
-    const response = await axios.post('https://quote.yuri.ly/quote/generate', payload)
+    const response = await axios.post('https://quote.nubcoder.com/generate', payload)
     if (response.data.error) {
       console.error('Error:', response.data.error)
       return
@@ -369,14 +383,14 @@ const completeExample = async () => {
     }
 
     // Option 1: Using the regular endpoint (returns base64)
-    const response = await axios.post('https://quote.yuri.ly/quote/generate', payload)
+    const response = await axios.post('https://quote.nubcoder.com/generate', payload)
     const buffer = Buffer.from(response.data.image, 'base64')
     fs.writeFileSync('quote.png', buffer)
     console.log("Saved quote.png")
 
     // Option 2: Using the PNG endpoint directly (returns binary)
     const binaryResponse = await axios.post(
-      'https://quote.yuri.ly/quote/generate.png',
+      'https://quote.nubcoder.com/generate.png',
       payload,
       { responseType: 'arraybuffer' }
     )
@@ -413,7 +427,7 @@ def simple_example():
     }
 
     try:
-        r = requests.post('https://quote.yuri.ly/quote/generate', json=payload)
+        r = requests.post('https://quote.nubcoder.com/generate', json=payload)
         data = r.json()
         if 'error' in data:
             print(f"Error: {data['error']}")
@@ -462,7 +476,7 @@ def complete_example():
 
     try:
         # Option 1: Using the regular endpoint (returns base64)
-        r = requests.post('https://quote.yuri.ly/quote/generate', json=payload)
+        r = requests.post('https://quote.nubcoder.com/generate', json=payload)
         data = r.json()
         img = base64.b64decode(data['image'])
         with open('quote.png', 'wb') as f:
@@ -470,7 +484,7 @@ def complete_example():
         print("Saved quote.png")
 
         # Option 2: Using the PNG endpoint directly (returns binary)
-        r = requests.post('https://quote.yuri.ly/quote/generate.png', json=payload)
+        r = requests.post('https://quote.nubcoder.com/generate.png', json=payload)
         with open('quote-direct.png', 'wb') as f:
             f.write(r.content)
         print("Saved quote-direct.png")
