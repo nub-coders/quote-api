@@ -57,7 +57,7 @@ The image bundles the native deps (canvas, sharp, ffmpeg) and Noto/Symbola fonts
 docker compose up -d --build
 ```
 
-The bundled `docker-compose.yaml` ships Traefik labels for `quote.nubcoder.com` and joins an external `web` network — adjust the host rule and network to match your setup. `Dockerfile.coolify` / `docker-compose.coolify.yml` are provided for Coolify deployments.
+The bundled `docker-compose.yaml` ships Traefik labels for `quote.nubcoders.com` and joins an external `web` network — adjust the host rule and network to match your setup.
 
 Optional env: set `BOT_API_ROOT` to route `getFile` and file downloads through a self-hosted Telegram Bot API server instead of the Telegram cloud.
 

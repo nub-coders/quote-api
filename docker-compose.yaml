@@ -7,7 +7,7 @@ services:
       - NODE_ENV=production
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.quote-api.rule=Host(`quote.nubcoder.com`)"
+      - "traefik.http.routers.quote-api.rule=Host(`quote.nubcoders.com`)"
       - "traefik.http.routers.quote-api.entrypoints=websecure"
       - "traefik.http.routers.quote-api.tls.certresolver=letsencrypt"
       - "traefik.http.services.quote-api.loadbalancer.server.port=3000"
