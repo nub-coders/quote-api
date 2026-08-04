@@ -10,6 +10,7 @@ const emojiDb = require('../emoji-db')
 const { drawMultilineText } = require('./text-renderer')
 const { drawAvatar } = require('./avatar')
 const { downloadMediaImage } = require('./media')
+const { pickMediaSource, mediaDialect, mediaFileId } = require('./pick-media')
 const { drawQuote } = require('./composer')
 const { drawLabel } = require('./canvas-utils')
 const { loadIcons, drawVoiceRow, drawDocumentRow, drawAudioRow, formatDuration } = require('./attachments')
@@ -225,14 +226,16 @@ class QuoteGenerate {
           const replyMedia = message.replyMessage.media
           if (replyMedia) {
             try {
+              // Same precedence as the main media block: pick the entry, then
+              // prefer inline base64 over a file_id we'd have to fetch.
+              const replyDialect = mediaDialect(pickMediaSource(replyMedia, false))
               let buffer
-              if (replyMedia.base64) {
-                buffer = Buffer.from(replyMedia.base64, 'base64')
-              } else if (replyMedia.url) {
-                buffer = await loadImageFromUrl(replyMedia.url)
+              if (replyDialect.type === 'base64') {
+                buffer = Buffer.from(replyDialect.value, 'base64')
+              } else if (replyDialect.type === 'url') {
+                buffer = await loadImageFromUrl(replyDialect.value)
               } else {
-                const fileId = replyMedia.fileId || replyMedia.file_id ||
-                  (Array.isArray(replyMedia) && replyMedia.length > 0 && (replyMedia[replyMedia.length - 1].file_id || replyMedia[replyMedia.length - 1]))
+                const fileId = mediaFileId(replyDialect.value)
                 if (fileId) {
                   const fileUrl = await this.telegram.getFileLink(fileId)
                   buffer = await loadImageFromUrl(fileUrl)
@@ -258,21 +261,12 @@ class QuoteGenerate {
       let media, type
       let crop = !!message.mediaCrop
 
-      if (message.media.base64) {
-        type = 'base64'
-        media = message.media.base64
-      } else if (message.media.url) {
-        type = 'url'
-        media = message.media.url
-      } else {
-        type = 'id'
-        if (message.media.length > 1) {
-          // BUG FIX: was message.media.pop() which mutated input
-          media = crop ? message.media[1] : message.media[message.media.length - 1]
-        } else {
-          media = message.media[0]
-        }
-      }
+      // `media` may be a single object or an array of files. Pick the file
+      // first — last one, or the second when cropping — then read the dialect
+      // off that entry, so base64 wins over file_id in the array form too.
+      const dialect = mediaDialect(pickMediaSource(message.media, crop))
+      type = dialect.type
+      media = dialect.value
 
       // Media caps at ⅔ of the target width (like Telegram photos). `width`
       // already carries the scale factor; the old `width / 3 * scale` only
