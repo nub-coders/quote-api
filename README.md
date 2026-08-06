@@ -298,13 +298,13 @@ This is especially useful for integrations that require direct file responses ra
 
 There is a deployed instance of this API available at:
 ```
-https://quote.nubcoder.com/generate
+https://quote.nubcoders.com/generate
 ```
 
 You can also use format-specific endpoints:
 ```
-https://quote.nubcoder.com/generate.png
-https://quote.nubcoder.com/generate.webp
+https://quote.nubcoders.com/generate.png
+https://quote.nubcoders.com/generate.webp
 ```
 
 You can use these URLs for testing purposes, but please note that stability isn't guaranteed for production use.
@@ -333,7 +333,7 @@ const simpleExample = async () => {
       }]
     }
 
-    const response = await axios.post('https://quote.nubcoder.com/generate', payload)
+    const response = await axios.post('https://quote.nubcoders.com/generate', payload)
     if (response.data.error) {
       console.error('Error:', response.data.error)
       return
@@ -383,14 +383,14 @@ const completeExample = async () => {
     }
 
     // Option 1: Using the regular endpoint (returns base64)
-    const response = await axios.post('https://quote.nubcoder.com/generate', payload)
+    const response = await axios.post('https://quote.nubcoders.com/generate', payload)
     const buffer = Buffer.from(response.data.image, 'base64')
     fs.writeFileSync('quote.png', buffer)
     console.log("Saved quote.png")
 
     // Option 2: Using the PNG endpoint directly (returns binary)
     const binaryResponse = await axios.post(
-      'https://quote.nubcoder.com/generate.png',
+      'https://quote.nubcoders.com/generate.png',
       payload,
       { responseType: 'arraybuffer' }
     )
@@ -427,7 +427,7 @@ def simple_example():
     }
 
     try:
-        r = requests.post('https://quote.nubcoder.com/generate', json=payload)
+        r = requests.post('https://quote.nubcoders.com/generate', json=payload)
         data = r.json()
         if 'error' in data:
             print(f"Error: {data['error']}")
@@ -476,7 +476,7 @@ def complete_example():
 
     try:
         # Option 1: Using the regular endpoint (returns base64)
-        r = requests.post('https://quote.nubcoder.com/generate', json=payload)
+        r = requests.post('https://quote.nubcoders.com/generate', json=payload)
         data = r.json()
         img = base64.b64decode(data['image'])
         with open('quote.png', 'wb') as f:
@@ -484,7 +484,7 @@ def complete_example():
         print("Saved quote.png")
 
         # Option 2: Using the PNG endpoint directly (returns binary)
-        r = requests.post('https://quote.nubcoder.com/generate.png', json=payload)
+        r = requests.post('https://quote.nubcoders.com/generate.png', json=payload)
         with open('quote-direct.png', 'wb') as f:
             f.write(r.content)
         print("Saved quote-direct.png")
